@@ -4,6 +4,8 @@ Turns raw text into a professionally designed PDF document using AI
 analysis (Kilo Gateway) + WeasyPrint rendering.
 """
 
+import asyncio
+import itertools
 import logging
 import os
 import tempfile
@@ -67,6 +69,49 @@ def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton(NEW_PDF_BTN, callback_data="new_pdf")]])
 
 
+# Rotating status lines shown while the AI analyzer is still working, so the
+# user sees the bot is alive instead of staring at a frozen "analyzing..."
+# message for 30-90+ seconds (free-tier model queueing can be slow).
+_ANALYZE_STAGES = [
+    "🧠 جاري تحليل المحتوى...",
+    "📖 جاري قراءة النص وفهم سياقه...",
+    "✍️ جاري تصحيح الصياغة وتنظيم الفقرات...",
+    "🔎 جاري تحديد نوع المستند وأسلوبه...",
+    "⏳ الموديل مشغول، لسه بنحلل... شكرًا لصبرك.",
+]
+_DESIGN_STAGES = [
+    "🎨 جاري تصميم المستند وإنشاء الـ PDF...",
+    "🖌️ جاري اختيار الألوان والتخطيط المناسب للمحتوى...",
+    "📐 جاري بناء الغلاف والفهرس...",
+    "📄 جاري تجميع الصفحات النهائية...",
+]
+
+
+async def _keepalive(status_msg, chat_id, bot, stages, interval=6.0):
+    """Background task: periodically edits the status message with a
+    rotating line + elapsed time, and pings the typing/upload chat action,
+    so the bot never looks stuck/dead during a long analyze or render call.
+    Cancelled as soon as the real work finishes."""
+    t0 = time.time()
+    cycle = itertools.cycle(stages)
+    next(cycle)  # first stage was already shown by the caller
+    try:
+        while True:
+            await asyncio.sleep(interval)
+            elapsed = int(time.time() - t0)
+            line = next(cycle)
+            try:
+                await status_msg.edit_text(f"{line}\n⏱️ {elapsed} ثانية...")
+            except Exception:
+                pass  # message unchanged / rate limit / already deleted — ignore
+            try:
+                await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+            except Exception:
+                pass
+    except asyncio.CancelledError:
+        pass
+
+
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         WELCOME_TEXT, parse_mode=ParseMode.MARKDOWN, reply_markup=main_keyboard()
@@ -101,10 +146,13 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    status_msg = await update.message.reply_text("🧠 جاري تحليل المحتوى...")
+    status_msg = await update.message.reply_text(_ANALYZE_STAGES[0])
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
 
     t0 = time.time()
+    keepalive_task = asyncio.create_task(
+        _keepalive(status_msg, chat_id, context.bot, _ANALYZE_STAGES)
+    )
     try:
         plan = await context.application.create_task(
             _run_blocking(analyze_text, text)
@@ -119,6 +167,8 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log.error("Unexpected analyzer failure:\n%s", traceback.format_exc())
         await status_msg.edit_text("❌ حدث خطأ غير متوقع أثناء التحليل. حاول مرة أخرى.")
         return
+    finally:
+        keepalive_task.cancel()
 
     doc_type_ar = {
         "report": "تقرير", "research": "بحث", "article": "مقال", "book": "كتاب",
@@ -128,11 +178,14 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }.get(plan.get("doc_type", "general"), "مستند")
 
     await status_msg.edit_text(
-        f"✅ تم التحليل — نوع المستند: *{doc_type_ar}*\n🎨 جاري تصميم المستند وإنشاء الـ PDF...",
+        f"✅ تم التحليل — نوع المستند: *{doc_type_ar}*\n{_DESIGN_STAGES[0]}",
         parse_mode=ParseMode.MARKDOWN,
     )
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_DOCUMENT)
 
+    keepalive_task = asyncio.create_task(
+        _keepalive(status_msg, chat_id, context.bot, _DESIGN_STAGES)
+    )
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             out_path = os.path.join(tmpdir, "document.pdf")
@@ -144,6 +197,7 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ).strip() or "document"
             filename = f"{safe_title[:60]}.pdf"
 
+            keepalive_task.cancel()
             with open(out_path, "rb") as f:
                 await update.message.reply_document(
                     document=f,
@@ -157,6 +211,8 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await status_msg.edit_text(
             "❌ حدث خطأ أثناء إنشاء ملف PDF. حاول مرة أخرى أو راجع النص المرسل."
         )
+    finally:
+        keepalive_task.cancel()
 
 
 async def _run_blocking(fn, *args):
