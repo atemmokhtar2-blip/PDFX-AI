@@ -144,6 +144,7 @@ def _call_model(model: str, user_text: str, timeout: float, system_hint: str = "
     if system_hint:
         full_system_prompt += f"\n\nIMPORTANT CONTEXT: {system_hint}"
         
+    # Use a faster model if possible, and optimize max_tokens
     payload = {
         "model": model,
         "reasoning": {"exclude": True},
@@ -151,7 +152,8 @@ def _call_model(model: str, user_text: str, timeout: float, system_hint: str = "
             {"role": "system", "content": full_system_prompt},
             {"role": "user", "content": user_text},
         ],
-        "max_tokens": 6000 if "REDESIGN" in system_hint else 4000,
+        "max_tokens": 5000 if "REDESIGN" in system_hint else 3000,
+        "temperature": 0.3, # Lower temperature for faster/more consistent output
     }
     headers = {
         "Authorization": f"Bearer {KILO_API_KEY}",

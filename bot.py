@@ -87,7 +87,7 @@ _DESIGN_STAGES = [
     "📄 جاري تجميع الصفحات النهائية...",
 ]
 
-async def _keepalive(status_msg, chat_id, bot, stages, interval=6.0):
+async def _keepalive(status_msg, chat_id, bot, stages, interval=4.0):
     t0 = time.time()
     cycle = itertools.cycle(stages)
     next(cycle)
