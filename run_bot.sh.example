@@ -1,0 +1,5 @@
+#!/bin/sh
+# Copy this file to run_bot.sh, fill in your real token, then run it.
+export PDFX_BOT_TOKEN="your-telegram-bot-token-here"
+export PDFX_MODEL="kilo-auto/free"
+exec python3 bot.py
