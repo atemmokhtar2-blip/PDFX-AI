@@ -37,7 +37,7 @@ import markdown as _markdown_module
 
 BOX_KINDS = {
     "definition", "warning", "highlight", "quote", "note", "steps",
-    "compare", "stats",
+    "compare", "stats", "image",
 }
 
 _FENCE_RE = re.compile(
@@ -146,6 +146,18 @@ def _render_compare(body: str) -> str:
     return f'<div class="box box-compare">{html}</div>'
 
 
+def _render_image(title: str, body: str) -> str:
+    # body is expected to be the image path or index
+    path = body.strip()
+    caption = title.strip()
+    return (
+        f'<div class="box box-image">'
+        f'<img src="{path}" style="max-width: 100%; height: auto; border-radius: 8px;">'
+        f'{f"<div class=\'image-caption\'>{caption}</div>" if caption else ""}'
+        f'</div>'
+    )
+
+
 def extract_boxes(content_markdown: str, rtl: bool) -> Tuple[str, Dict[str, str]]:
     """Replace every `:::kind ... :::` fence with a unique placeholder token
     and return (patched_markdown, {token: rendered_html})."""
@@ -164,6 +176,8 @@ def extract_boxes(content_markdown: str, rtl: bool) -> Tuple[str, Dict[str, str]
             html = _render_stats(body)
         elif kind == "compare":
             html = _render_compare(body)
+        elif kind == "image":
+            html = _render_image(title, body)
         else:
             html = _render_callout(kind, title, body, rtl)
 

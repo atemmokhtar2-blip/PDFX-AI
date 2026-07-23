@@ -139,15 +139,19 @@ def _extract_json(text: str) -> dict:
 FALLBACK_MODELS = ["kilo-auto/free", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", "poolside/laguna-s-2.1:free"]
 
 
-def _call_model(model: str, user_text: str, timeout: float) -> str:
+def _call_model(model: str, user_text: str, timeout: float, system_hint: str = "") -> str:
+    full_system_prompt = SYSTEM_PROMPT
+    if system_hint:
+        full_system_prompt += f"\n\nIMPORTANT CONTEXT: {system_hint}"
+        
     payload = {
         "model": model,
         "reasoning": {"exclude": True},
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": full_system_prompt},
             {"role": "user", "content": user_text},
         ],
-        "max_tokens": 4000,
+        "max_tokens": 6000 if "REDESIGN" in system_hint else 4000,
     }
     headers = {
         "Authorization": f"Bearer {KILO_API_KEY}",
@@ -170,7 +174,7 @@ def _call_model(model: str, user_text: str, timeout: float) -> str:
     return content
 
 
-def analyze_text(user_text: str, timeout: float = 90.0) -> dict:
+def analyze_text(user_text: str, timeout: float = 120.0, system_hint: str = "") -> dict:
     if not KILO_API_KEY:
         raise AnalyzerError("Missing KILOCODE_API_KEY")
 
@@ -180,7 +184,7 @@ def analyze_text(user_text: str, timeout: float = 90.0) -> dict:
     plan = None
     for model in models_to_try:
         try:
-            content = _call_model(model, user_text, timeout)
+            content = _call_model(model, user_text, timeout, system_hint)
         except AnalyzerError as e:
             last_error = e
             continue
