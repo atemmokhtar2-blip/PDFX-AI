@@ -27,13 +27,13 @@ DOC_TYPE_LABELS_AR = {
     "report": "تقرير", "research": "بحث", "article": "مقال", "book": "كتاب",
     "summary": "ملخص", "memo": "مذكرة", "cv": "سيرة ذاتية", "invoice": "فاتورة",
     "letter": "خطاب رسمي", "contract": "عقد", "business_plan": "خطة عمل",
-    "proposal": "عرض مشروع", "general": "مستند",
+    "proposal": "عرض مشروع", "exam": "امتحان", "quiz": "اختبار", "study_guide": "دليل دراسي", "general": "مستند",
 }
 DOC_TYPE_LABELS_EN = {
     "report": "Report", "research": "Research Paper", "article": "Article",
     "book": "Book", "summary": "Summary", "memo": "Memo", "cv": "Curriculum Vitae",
     "invoice": "Invoice", "letter": "Formal Letter", "contract": "Contract",
-    "business_plan": "Business Plan", "proposal": "Project Proposal", "general": "Document",
+    "business_plan": "Business Plan",     "proposal": "Project Proposal", "exam": "Exam", "quiz": "Quiz", "study_guide": "Study Guide", "general": "Document",
 }
 
 _env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
@@ -89,6 +89,7 @@ def render_pdf(plan: dict, output_path: str) -> str:
         page_other_side="left" if rtl else "right",
         page_label_prefix="صفحة " if rtl else "Page ",
         page_label_mid=" من " if rtl else " of ",
+        tone_class=f"tone-{design.tone}" if design.tone else "",
     )
 
     HTML(string=html_str, base_url=BASE_DIR).write_pdf(output_path)

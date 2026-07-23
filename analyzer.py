@@ -94,7 +94,24 @@ Smart content boxes — use this fenced syntax INLINE in content_markdown whenev
   :::
   (use :::compare specifically for side-by-side comparisons, distinct from a generic data table)
 
+  :::question QuestionNumber
+  Question text and options...
+  :::
+  (use :::question for every individual question or exam item)
+
+  :::image Caption
+  image_path_or_id
+  :::
+  (use :::image for all visual elements to ensure professional framing)
+
 Each box's fence markers (`:::kind ...` and the closing `:::`) must be on their own line with a blank line before and after. Never nest boxes inside each other.
+
+For EDUCATIONAL/EXAM content:
+- Prioritize whitespace and readability.
+- Wrap every question in a `:::question` block.
+- If a question has an image, keep it INSIDE the `:::question` block.
+- Use `:::image` for any visual elements to ensure professional framing.
+- Ensure clear separation between questions.
 """
 
 

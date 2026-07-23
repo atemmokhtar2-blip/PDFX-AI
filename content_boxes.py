@@ -37,7 +37,7 @@ import markdown as _markdown_module
 
 BOX_KINDS = {
     "definition", "warning", "highlight", "quote", "note", "steps",
-    "compare", "stats", "image",
+    "compare", "stats", "image", "question",
 }
 
 _FENCE_RE = re.compile(
@@ -150,12 +150,31 @@ def _render_image(title: str, body: str) -> str:
     # body is expected to be the image path or index
     path = body.strip()
     caption = title.strip()
+    
+    # Enhanced image presentation
     return (
-        f'<div class="box box-image">'
-        f'<img src="{path}" style="max-width: 100%; height: auto; border-radius: 8px;">'
-        f'{f"<div class=\'image-caption\'>{caption}</div>" if caption else ""}'
+        f'<div class="box box-image-container">'
+        f'  <div class="image-frame">'
+        f'    <img src="{path}" class="educational-image">'
+        f'  </div>'
+        f'  {f"<div class=\'image-caption\'>{caption}</div>" if caption else ""}'
         f'</div>'
     )
+
+def _render_question(title: str, body: str) -> str:
+    # title can be the question number or type
+    q_num = title.strip()
+    
+    # Check if body contains an image box placeholder
+    # We want to ensure images inside questions are handled specially in CSS
+    has_image = "PDFXBOX" in body and "image" in body.lower()
+    
+    parts = [f'<div class="box box-question {"has-image" if has_image else ""}">']
+    if q_num:
+        parts.append(f'<div class="question-num">{q_num}</div>')
+    parts.append(f'<div class="question-body">{_inline_md(body)}</div>')
+    parts.append('</div>')
+    return "".join(parts)
 
 
 def extract_boxes(content_markdown: str, rtl: bool) -> Tuple[str, Dict[str, str]]:
@@ -178,6 +197,8 @@ def extract_boxes(content_markdown: str, rtl: bool) -> Tuple[str, Dict[str, str]
             html = _render_compare(body)
         elif kind == "image":
             html = _render_image(title, body)
+        elif kind == "question":
+            html = _render_question(title, body)
         else:
             html = _render_callout(kind, title, body, rtl)
 

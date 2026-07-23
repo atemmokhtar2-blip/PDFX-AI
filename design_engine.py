@@ -39,7 +39,7 @@ from typing import Any, Dict, List, Optional
 
 TONES = [
     "formal", "academic", "technical", "business", "medical", "legal",
-    "educational", "creative", "friendly", "personal", "playful",
+    "educational", "exam", "creative", "friendly", "personal", "playful",
 ]
 
 _DOC_TYPE_TONE_HINTS = {
@@ -47,6 +47,7 @@ _DOC_TYPE_TONE_HINTS = {
     "book": "creative", "summary": "editorial", "memo": "business",
     "cv": "business", "invoice": "formal", "letter": "formal",
     "contract": "legal", "business_plan": "business", "proposal": "business",
+    "exam": "educational", "quiz": "educational", "study_guide": "educational",
     "general": "friendly",
 }
 
@@ -82,7 +83,7 @@ class Palette:
 _PALETTE_FAMILIES: List[Dict[str, Any]] = [
     {"name": "deep-ocean", "tones": ["formal", "business", "legal", "academic"],
      "primary": (210, 65, 24), "accent": (204, 68, 55), "surface_alt": (210, 35, 96)},
-    {"name": "forest", "tones": ["academic", "educational", "medical", "formal"],
+    {"name": "forest", "tones": ["academic", "educational", "exam", "medical", "formal"],
      "primary": (152, 45, 22), "accent": (152, 45, 42), "surface_alt": (140, 30, 96)},
     {"name": "charcoal-amber", "tones": ["technical", "business", "formal"],
      "primary": (222, 15, 16), "accent": (38, 78, 58), "surface_alt": (35, 22, 95)},
@@ -90,13 +91,13 @@ _PALETTE_FAMILIES: List[Dict[str, Any]] = [
      "primary": (317, 45, 22), "accent": (344, 70, 45), "surface_alt": (320, 35, 96)},
     {"name": "slate-teal", "tones": ["technical", "business", "medical"],
      "primary": (177, 60, 15), "accent": (172, 60, 47), "surface_alt": (175, 35, 96)},
-    {"name": "terracotta", "tones": ["creative", "personal", "educational", "friendly", "playful"],
+    {"name": "terracotta", "tones": ["creative", "personal", "educational", "exam", "friendly", "playful"],
      "primary": (16, 70, 28), "accent": (38, 90, 55), "surface_alt": (28, 45, 96)},
     {"name": "indigo", "tones": ["formal", "technical", "academic", "business"],
      "primary": (248, 45, 20), "accent": (243, 75, 60), "surface_alt": (240, 40, 96)},
     {"name": "rose-gold", "tones": ["creative", "personal", "friendly", "playful"],
      "primary": (330, 60, 28), "accent": (330, 75, 65), "surface_alt": (330, 40, 96)},
-    {"name": "sunny", "tones": ["friendly", "educational", "personal", "playful"],
+    {"name": "sunny", "tones": ["friendly", "educational", "exam", "personal", "playful"],
      "primary": (32, 90, 27), "accent": (48, 90, 55), "surface_alt": (45, 55, 95)},
     {"name": "midnight-cyan", "tones": ["technical", "business", "editorial"],
      "primary": (222, 45, 12), "accent": (200, 90, 55), "surface_alt": (210, 40, 96)},
@@ -199,7 +200,11 @@ def build_design_spec(plan: Dict[str, Any], rng: Optional[random.Random] = None)
     toc_style = rng.choice(TOC_STYLES)
 
     content_len = len(plan.get("content_markdown") or "")
-    density = "compact" if content_len > 4500 else rng.choice(["airy", "airy", "compact"])
+    # Educational/Exam content MUST be airy for readability
+    if tone in ["educational", "exam"]:
+        density = "airy"
+    else:
+        density = "compact" if content_len > 4500 else rng.choice(["airy", "airy", "compact"])
 
     rounded = tone in _PLAYFUL_TONES or rng.random() < 0.35
 

@@ -25,7 +25,7 @@ body {
 /* ---------- Page setup ---------- */
 @page {
   size: A4;
-  margin: {{ '2.8cm 2cm 2.3cm 2cm' if design.density == 'airy' else '2.3cm 1.7cm 2cm 1.7cm' }};
+  margin: {{ '3.2cm 2.5cm 2.8cm 2.5cm' if design.density == 'airy' else '2.3cm 1.7cm 2cm 1.7cm' }};
   @top-{{ page_side }} {
     content: "{{ plan.title|truncate(48) }}";
     font-family: {{ font_stack }};
@@ -301,7 +301,7 @@ body {
   margin-{{ 'left' if plan.direction == 'rtl' else 'right' }}: 0.25cm;
 }
 
-.content { counter-reset: h2counter; }
+/* Counter reset moved to Figure numbering section */
 .heading-boxed-number .content h2 {
   counter-increment: h2counter;
   display: flex; align-items: center; gap: 0.3cm;
@@ -442,4 +442,102 @@ body {
   font-size: 9.5pt;
   color: var(--muted);
   font-style: italic;
+}
+
+/* =====================================================================
+   EDUCATIONAL & IMAGE ENHANCEMENTS
+   ===================================================================== */
+
+/* Image Presentation Engine */
+.box-image-container {
+  margin: 0.8cm 0;
+  text-align: center;
+  break-inside: avoid;
+}
+
+.image-frame {
+  display: inline-block;
+  padding: 0.3cm;
+  background: var(--white);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border-radius: var(--radius-sm);
+  max-width: 100%;
+}
+
+.educational-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 2px;
+}
+
+.image-caption {
+  margin-top: 0.3cm;
+  font-size: 9.5pt;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Figure numbering */
+.content { counter-reset: h2counter figurecounter; }
+.box-image-container { counter-increment: figurecounter; }
+.image-caption::before {
+  content: "{{ 'شكل ' if plan.direction == 'rtl' else 'Figure ' }}" counter(figurecounter) ": ";
+  font-weight: 700;
+  font-style: normal;
+}
+
+/* Question Layout Engine */
+.box-question {
+  margin: 1cm 0;
+  padding: 0.6cm;
+  background: var(--white);
+  border: 1.5pt solid var(--line);
+  border-radius: var(--radius);
+  position: relative;
+  break-inside: avoid;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+}
+
+.question-num {
+  position: absolute;
+  top: -0.4cm;
+  {{ 'right' if plan.direction == 'rtl' else 'left' }}: 0.5cm;
+  background: var(--primary);
+  color: var(--white);
+  padding: 0.1cm 0.4cm;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 11pt;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.question-body {
+  margin-top: 0.2cm;
+}
+
+.question-body p:first-child { margin-top: 0; }
+
+/* White space and readability */
+.content h2, .content h3 {
+  break-after: avoid;
+}
+
+.content p, .content li {
+  orphans: 3;
+  widows: 3;
+}
+
+/* Tone-specific adjustments */
+body.tone-educational, body.tone-exam {
+  font-size: 12pt;
+}
+
+.tone-educational .content h2, .tone-exam .content h2 {
+  color: var(--primary);
+  border-bottom: 2.5pt solid var(--accent-wash);
+  display: inline-block;
+  padding-bottom: 0.1cm;
+  margin-bottom: 0.6cm;
 }
