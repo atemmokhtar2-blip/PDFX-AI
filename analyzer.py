@@ -37,7 +37,8 @@ Schema:
   "date": "date if mentioned or relevant, else null",
   "needs_cover": true|false (true for longer/formal docs like reports, research, books, business plans, contracts, CVs; false for short memos/letters),
   "needs_toc": true|false (true only if the document has 3+ major sections and is reasonably long),
-  "content_markdown": "the full corrected, well-organized document body, written in Markdown, using the smart-box syntax below wherever it fits"
+  "content_markdown": "the full corrected, well-organized document body, written in Markdown, using the smart-box syntax below wherever it fits",
+  "images": [{"path": "image_path", "page": 1, "index": 1, "bbox": [x0, y0, x1, y1]}], # List of extracted images with their paths and bounding boxes
 }
 
 Rules for content_markdown:
@@ -100,16 +101,15 @@ Smart content boxes — use this fenced syntax INLINE in content_markdown whenev
   (use :::question for every individual question or exam item)
 
   :::image Caption
-  image_path_or_id
+  image_path_or_id # Use the image path provided in the input, do not invent new paths
   :::
-  (use :::image for all visual elements to ensure professional framing)
 
-Each box's fence markers (`:::kind ...` and the closing `:::`) must be on their own line with a blank line before and after. Never nest boxes inside each other.
+Each box\'s fence markers (`:::kind ...` and the closing `:::`) must be on their own line with a blank line before and after. Never nest boxes inside each other.
 
 For EDUCATIONAL/EXAM content:
 - Prioritize whitespace and readability.
 - Wrap every question in a `:::question` block.
-- If a question has an image, keep it INSIDE the `:::question` block.
+- If a question has an image, keep it INSIDE the `:::question` block, using the `:::image` smart box with the provided image path.
 - Use `:::image` for any visual elements to ensure professional framing.
 - Ensure clear separation between questions.
 """

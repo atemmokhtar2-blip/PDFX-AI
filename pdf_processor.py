@@ -1,8 +1,10 @@
+
 import fitz  # PyMuPDF
 import os
 import pandas as pd
 import pdfplumber
 from concurrent.futures import ThreadPoolExecutor
+from image_recovery_engine import extract_and_process_image, recover_corrupted_image
 
 def extract_page_data(page_num, doc, images_dir):
     """Helper to extract text and images from a single page."""
@@ -11,22 +13,16 @@ def extract_page_data(page_num, doc, images_dir):
     
     images = []
     for img_index, img in enumerate(page.get_images(full=True)):
-        xref = img[0]
-        base_image = doc.extract_image(xref)
-        image_bytes = base_image["image"]
-        image_ext = base_image["ext"]
-        image_filename = f"page{page_num+1}_img{img_index+1}.{image_ext}"
-        image_path = os.path.join(images_dir, image_filename)
-        
-        with open(image_path, "wb") as f:
-            f.write(image_bytes)
-        
-        images.append({
-            "path": image_path,
-            "page": page_num + 1,
-            "index": img_index + 1
-        })
-    
+        # Extract and process image using the new engine
+        processed_image = extract_and_process_image(doc, page_num, img_index, img, images_dir)
+        if processed_image:
+            images.append(processed_image)
+        else:
+            # Attempt to recover corrupted images
+            recovered_image = recover_corrupted_image(page, img[1], images_dir, page_num, img_index)
+            if recovered_image:
+                images.append(recovered_image)
+
     return page_num + 1, page_text, images
 
 def extract_pdf_content(pdf_path: str, output_dir: str):
@@ -98,5 +94,14 @@ def format_content_for_ai(content: dict) -> str:
         prompt += "\n--- TABLES ---\n"
         for table in content["tables"][:5]: # Limit to first 5 tables for speed
             prompt += f"T(P{table['page']}): {table['data']}\n"
+            
+    # Add image information to the prompt for the AI to use
+    if content["images"]:
+        prompt += "\n--- IMAGES ---\n"
+        for img in content["images"]:
+            # Include image as a smart box in the content_markdown for the AI to place
+            # We'll use a simplified representation for the AI to interpret
+            # The AI is expected to re-insert these into the content_markdown in logical places
+            prompt += f":::image Image from Page {img["page"]}\n{img["path"]}\n{img.get("bbox", "")}\n:::\n"
             
     return prompt

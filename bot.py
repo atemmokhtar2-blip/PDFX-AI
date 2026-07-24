@@ -25,6 +25,7 @@ from telegram.ext import (
 from analyzer import AnalyzerError, analyze_text
 from renderer import render_pdf
 from pdf_processor import extract_pdf_content, format_content_for_ai
+from cache_manager import get_cached_content, set_cached_content
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -77,7 +78,8 @@ _REDESIGN_STAGES = [
     "📥 جاري معالجة ملف الـ PDF...",
     "🔍 جاري استخراج النصوص والجداول...",
     "🖼️ جاري استخراج الصور وتحسين جودتها...",
-    "🧠 جاري إعادة بناء هيكل المستند بالذكاء الاصطناعي...",
+    "🧠 جاري تحليل الهيكل وإعادة بناء المستند بالذكاء الاصطناعي...",
+    "⏳ الموديل مشغول، لسه بنحلل... شكرًا لصبرك.",
 ]
 
 _DESIGN_STAGES = [
@@ -129,23 +131,33 @@ async def on_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keepalive_task = asyncio.create_task(_keepalive(status_msg, chat_id, context.bot, _REDESIGN_STAGES))
     
     try:
-        with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_obj = tempfile.TemporaryDirectory()
+        tmpdir = tmpdir_obj.name
             pdf_file = await doc.get_file()
             pdf_path = os.path.join(tmpdir, "input.pdf")
             await pdf_file.download_to_drive(pdf_path)
-            
-            content = await _run_blocking(extract_pdf_content, pdf_path, tmpdir)
+
+            cached_content = get_cached_content(pdf_path)
+            if cached_content:
+                content = cached_content
+                await status_msg.edit_text("✅ تم العثور على نسخة مخبأة. جاري استخدامها.")
+            else:
+                content = await _run_blocking(extract_pdf_content, pdf_path, tmpdir)
+                set_cached_content(pdf_path, content)
+
             formatted_text = format_content_for_ai(content)
             
             keepalive_task.cancel()
-            await handle_processing(update, context, formatted_text, is_pdf=True, status_msg=status_msg)
+            await handle_processing(update, context, formatted_text, is_pdf=True, status_msg=status_msg, tmpdir_obj=tmpdir_obj)
             
     except Exception as e:
         keepalive_task.cancel()
         log.error("PDF processing error: %s", traceback.format_exc())
         await status_msg.edit_text("❌ حدث خطأ أثناء معالجة ملف الـ PDF.")
+        if 'tmpdir_obj' in locals() and tmpdir_obj:
+            tmpdir_obj.cleanup() # Ensure cleanup if an error occurs before handle_processing
 
-async def handle_processing(update, context, text, is_pdf=False, status_msg=None):
+async def handle_processing(update, context, text, is_pdf=False, status_msg=None, tmpdir_obj=None):
     chat_id = update.effective_chat.id
     t0 = time.time()
     
@@ -175,18 +187,27 @@ async def handle_processing(update, context, text, is_pdf=False, status_msg=None
         keepalive_task.cancel()
         keepalive_task = asyncio.create_task(_keepalive(status_msg, chat_id, context.bot, _DESIGN_STAGES))
         
-        with tempfile.TemporaryDirectory() as tmpdir:
+            if tmpdir_obj is None:
+                tmpdir_obj = tempfile.TemporaryDirectory()
+            tmpdir = tmpdir_obj.name
             out_path = os.path.join(tmpdir, "output.pdf")
-            await context.application.create_task(_run_blocking(render_pdf, plan, out_path))
-            
-            elapsed = time.time() - t0
-            filename = f"Redesigned_{plan.get('title', 'document')[:50]}.pdf"
-            
-            with open(out_path, "rb") as f:
-                await update.message.reply_document(
-                    document=f, filename=filename,
-                    caption=f"✅ تم {'إعادة تصميم' if is_pdf else 'إنشاء'} المستند بنجاح في {elapsed:.1f} ثانية."
-                )
+                
+                # Background Task: Rendering PDF
+                render_task = context.application.create_task(_run_blocking(render_pdf, plan, out_path))
+                await render_task
+                
+                elapsed = time.time() - t0
+                filename = f"Redesigned_{plan.get('title', 'document')[:50]}.pdf"
+                
+                with open(out_path, "rb") as f:
+                    await update.message.reply_document(
+                        document=f, filename=filename,
+                        caption=f"✅ تم {'إعادة تصميم' if is_pdf else 'إنشاء'} المستند بنجاح في {elapsed:.1f} ثانية."
+                    )
+                
+                # Memory Optimization: Cleanup large image files in background
+                if is_pdf and tmpdir_obj:
+                    context.application.create_task(_run_blocking(cleanup_temp_files, tmpdir_obj))
         await status_msg.delete()
     except Exception as e:
         log.error("Processing failure: %s", traceback.format_exc())
@@ -194,10 +215,19 @@ async def handle_processing(update, context, text, is_pdf=False, status_msg=None
             await status_msg.edit_text(f"❌ حدث خطأ أثناء المعالجة: {str(e)[:100]}")
     finally:
         keepalive_task.cancel()
+        if tmpdir_obj:
+            tmpdir_obj.cleanup()
 
 async def _run_blocking(fn, *args):
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, fn, *args)
+
+def cleanup_temp_files(tmpdir_obj):
+    """Background task to clean up temporary files to optimize memory."""
+    try:
+        tmpdir_obj.cleanup()
+    except Exception as e:
+        log.error(f"Error cleaning up temp directory {tmpdir_obj.name}: {e}")
 
 def build_app() -> Application:
     app = Application.builder().token(BOT_TOKEN).build()
